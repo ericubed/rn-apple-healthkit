@@ -213,6 +213,16 @@ RCT_EXPORT_METHOD(enableBackgroundDelivery:(NSDictionary *)input callback:(RCTRe
     [self background_enableBackgroundDelivery:input callback:callback];
 }
 
+RCT_EXPORT_METHOD(disableBackgroundDelivery:(NSDictionary *)input callback:(RCTResponseSenderBlock)callback)
+{
+    [self background_disableBackgroundDelivery:input callback:callback];
+}
+
+RCT_EXPORT_METHOD(initializeListenersWithCallback:(RCTResponseSenderBlock)callback)
+{
+    [self background_initialListenersWithCallback:callback];
+}
+
 - (void)isHealthKitAvailable:(RCTResponseSenderBlock)callback
 {
     BOOL isAvailable = NO;

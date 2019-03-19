@@ -15,20 +15,39 @@
 
 @implementation RCTAppleHealthKit (Background)
 
+NSArray *kTypes = nil;
+
 - (void)background_enableBackgroundDelivery:(NSDictionary *)input callback:(RCTResponseSenderBlock)callback
 {
-    HKSampleType *sampleType =
-    [HKObjectType quantityTypeForIdentifier:HKQuantityTypeIdentifierStepCount];
+    if (!kTypes)
+    {
+        kTypes = @[
+                   [HKObjectType quantityTypeForIdentifier:HKQuantityTypeIdentifierStepCount],
+                   [HKObjectType quantityTypeForIdentifier:HKQuantityTypeIdentifierBodyMass],
+                   [HKObjectType quantityTypeForIdentifier:HKQuantityTypeIdentifierBodyTemperature]
+                   ];
+    }
     
-    [self.healthStore enableBackgroundDeliveryForType:sampleType
-                                            frequency:HKUpdateFrequencyHourly
-                                       withCompletion:^(BOOL success, NSError * _Nullable error) {
-        if (success) {
+    dispatch_group_t group = dispatch_group_create();
+    __block BOOL completedSuccessfully = YES;
+    
+    dispatch_group_notify(group, dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        if (completedSuccessfully)
+        {
             [self background_initializeListenersWithCallback:callback];
-        } else if (error) {
-            
         }
-    }];
+    });
+    
+    for (HKSampleType *type in kTypes)
+    {
+        dispatch_group_enter(group);
+        [self.healthStore enableBackgroundDeliveryForType:type
+                                                frequency:HKUpdateFrequencyHourly
+                                           withCompletion:^(BOOL success, NSError * _Nullable error) {
+                                               dispatch_group_leave(group);
+                                               completedSuccessfully = completedSuccessfully && success;
+                                           }];
+    }
 }
 
 - (void)background_disableBackgroundDelivery:(NSDictionary *)input callback:(RCTResponseSenderBlock)callback
@@ -40,61 +59,35 @@
 
 - (void)background_initializeListenersWithCallback:(RCTResponseSenderBlock)callback
 {
-    HKSampleType *sampleType =
-    [HKObjectType quantityTypeForIdentifier:HKQuantityTypeIdentifierStepCount];
-    
-    HKObserverQuery *query =
-    [[HKObserverQuery alloc]
-     initWithSampleType:sampleType
-     predicate:nil
-     updateHandler:^(HKObserverQuery *query,
-                     HKObserverQueryCompletionHandler completionHandler,
-                     NSError *error) {
-         
-         if (error) {
-             // Perform Proper Error Handling Here...
-             NSLog(@"*** An error occured while setting up the stepCount observer. %@ ***", error.localizedDescription);
-             callback(@[RCTMakeError(@"An error occured while setting up the stepCount observer", error, nil)]);
-             return;
-         }
-         
-         [self.bridge.eventDispatcher sendAppEventWithName:@"change:steps"
-                                                      body:@{@"name": @"change:steps"}];
-         
-         completionHandler();
-     }];
-    
-    [self.healthStore executeQuery:query];
+    for (HKSampleType *type in kTypes)
+    {
+        HKObserverQuery *query =
+        [[HKObserverQuery alloc]
+         initWithSampleType:type
+         predicate:nil
+         updateHandler:^(HKObserverQuery *query,
+                         HKObserverQueryCompletionHandler completionHandler,
+                         NSError *error) {
+             
+             if (error)
+             {
+                 // Perform Proper Error Handling Here...
+                 NSLog(@"*** An error occured while setting up the stepCount observer. %@ ***", error.localizedDescription);
+                 callback(@[RCTMakeError(@"An error occured while setting up the stepCount observer", error, nil)]);
+                 return;
+             }
+             
+             NSString *name = [NSString stringWithFormat:@"change:%@", type.identifier];
+             NSLog(@"*** Firing event named: %@", name);
+             
+             [self.bridge.eventDispatcher sendAppEventWithName:name
+                                                          body:@{@"name": name}];
+             
+             completionHandler();
+         }];
+        
+        [self.healthStore executeQuery:query];
+    }
 }
-
-
-
-//HKSampleType *sampleType =
-//[HKObjectType quantityTypeForIdentifier:HKQuantityTypeIdentifierStepCount];
-//
-//HKObserverQuery *query =
-//[[HKObserverQuery alloc]
-// initWithSampleType:sampleType
-// predicate:nil
-// updateHandler:^(HKObserverQuery *query,
-//                 HKObserverQueryCompletionHandler completionHandler,
-//                 NSError *error) {
-//
-//     if (error) {
-//         // Perform Proper Error Handling Here...
-//         NSLog(@"*** An error occured while setting up the stepCount observer. %@ ***", error.localizedDescription);
-//         callback(@[RCTMakeError(@"An error occured while setting up the stepCount observer", error, nil)]);
-//         return;
-//     }
-//
-//     [self.bridge.eventDispatcher sendAppEventWithName:@"change:steps"
-//                                                  body:@{@"name": @"change:steps"}];
-//
-//     // If you have subscribed for background updates you must call the completion handler here.
-//     // completionHandler();
-//
-// }];
-//
-//[self.healthStore executeQuery:query];
 
 @end
