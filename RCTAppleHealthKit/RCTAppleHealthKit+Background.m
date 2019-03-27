@@ -28,18 +28,22 @@ NSArray *kTypes = nil;
                    ];
     }
     
+    NSLog(@"*** HealthKit background initialization starting ***");
+    
     dispatch_group_t group = dispatch_group_create();
     __block BOOL completedSuccessfully = YES;
     
     dispatch_group_notify(group, dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         if (completedSuccessfully)
         {
+            NSLog(@"*** HealthKit background initialization completed successfully ***");
             [self background_initializeListenersWithCallback:callback];
         }
     });
     
     for (HKSampleType *type in kTypes)
     {
+        NSLog(@"*** *** Enabling background delivery for type: %@", type.identifier);
         dispatch_group_enter(group);
         [self.healthStore enableBackgroundDeliveryForType:type
                                                 frequency:HKUpdateFrequencyHourly
